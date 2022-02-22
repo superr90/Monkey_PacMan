@@ -1,26 +1,24 @@
-# Monkey Plays Pac-Man with Compositional Strategies and Hierarchical Decision-making
+# Hierarchical Decision-Making Analysis for Behavior Data
 
 
 ## Quickstart
 
-We provide a script to reproduce figures in the following paper: 
 
-Yang, Q., Lin, Z., Zhang, W., Li, J., Chen, X., Zhang, J., & Yang, T. (2021). Monkey Plays Pac-Man with Compositional Strategies and Hierarchical Decision-making. *bioRxiv*.
+For Pacman data analysis, ypou should first [compute utility functions](./Behavior_Analysis/HierarchicalModel/PreEstimation.py) 
+and [convert zero values to -inf](./Behavior_Analysis/HierarchicalModel/UtilityConvert.py).Then [fit strategy weights](./Behavior_Analysis/Fitting/MergeFitting.py).
 
-Please run the file: 
-
-```
-python Analysis/Plotting/FigPltting.py
-```
-All the figures will be saved into the ```Fig``` directory. 
-
-We also provide codes of behavioral data analysis in ```Analysis/Analysis/FigAllSave.py```. 
-Running this script requires full data sets for two monkeys' game-play. We will release access to these data in the future. Nontheless, we provided precomputed analysis results in ```Data/plot_data``, with all figures in the paper draft plotted.
+We also provide codes of experiment analysis in ```Analysis/Analysis/FigAllSave.py```. 
+However, running this script requires all the data. So you are free to check the code logic but they might raise 
+exceptions if you run that file.  We have provided precomputed analysis results in ```Data/Behavior_Plot_Data```, 
+with which the figures are plotted. Figures are plotted with  ```Behavior_Analysis/Plotting/FiPlotting``` and 
+will be saved in ```Behavior_Analysis/Fig```.
 
 ## Data Description
 
-We provide sample data of Monkey O and P playing the Pac-Man game at 05-Sep-2019, along with fitted strategy weights, in the file ```Data/fitted_data/05-Sep-2019-example_data.pkl```. 
-The main features of this dataset and their descriptions are listed as below: 
+We provide an example data of 10 trials as ```Data/TestExample/10_trial_data_Omega.pkl``` for you to test codes. 
+Its utility values and fitted strategy weights are saved in ```Data/TestExample/10_trial_data_Omega-with_Q-inf-merge_weight-dynamic-res.pkl```.
+ 
+The main features of the dataset and their descriptions are listed as below: 
 
 
 |  Column Name |     Data Type    |                             Description                             |
@@ -36,23 +34,3 @@ The main features of this dataset and their descriptions are listed as below:
 |   fruitPos   |      2-tuple     |                        position of the fruit                        |
 |    Reward    |        int       |                          type of the fruit                          |
 | contribution |       list       | normalized weights of all the agents that are fitted by our model |
-
-## Directory Layout
-
-```
-Pacman_Behavioral_Analysis
-│   README.md  
-└───Analysis
-│   │   Analysis
-│   │   Plotting
-└───Utils
-│   │   ComputationUtils.py
-│   │   CostVal.py
-│   │   FigUtils.py
-│   │   FieUtils.py
-└───Data
-│   │   constant
-│   │   fitted_data
-│   │   plot_data
-└───Fig
-```

@@ -1,12 +1,6 @@
 '''
 Description:
     Utility functions for the figure plotting.
-
-Author:
-    Jiaqi Zhang <zjqseu@gmail.com>
-
-Date:
-    3 Feb. 2021
 '''
 import numpy as np
 import pandas as pd
@@ -29,8 +23,11 @@ def eval_df(df_total, l):
         )
     return df_total
 
-
-MAP_INFO = eval_df(pd.read_csv("../../Data/constant/map_info_brian.csv"), ["pos", "pos_global"])
+#TODO: remove this part out of this file
+try:
+	MAP_INFO = eval_df(pd.read_csv("../../Data/constant/map_info_brian.csv"), ["pos", "pos_global"])
+except:
+	MAP_INFO = eval_df(pd.read_csv("../Data/constant/map_info_brian.csv"), ["pos", "pos_global"])
 
 POSSIBLE_DIRS = (
     MAP_INFO[["pos", "Next1Pos2", "Next2Pos2", "Next3Pos2", "Next4Pos2"]]
@@ -74,6 +71,11 @@ TURNING_POS = list(
     )
 )
 OPPOSITE_DIRS = {"left": "right", "right": "left", "up": "down", "down": "up"}
+
+LOCS_DF = eval_df(
+    pd.read_csv("../../Data/constant/dij_distance_map.csv"),
+    ["pos1", "pos2", "path", "relative_dir"],
+)
 
 
 def relative_dir(pt_pos, pacman_pos):
@@ -126,7 +128,8 @@ def add_states(df_reset):
     df_tmp = pd.DataFrame(
         [
             [np.nan] * 6 if isinstance(i, float) else i
-            for i in df_reset.contribution.to_list()
+            # for i in df_reset.contribution.to_list()
+            for i in df_reset.weight.to_list()
         ],
         columns=["global", "local", "evade_blinky", "evade_clyde", "approach", "energizer"],
     )
@@ -191,7 +194,7 @@ def vague_consecutive_groups(df_total):
     return sel_index
 
 
-def evade_consecutive_groups(df_total): #TODO: this function!
+def evade_consecutive_groups(df_total):
     trial_index = df_total.groupby("file").apply(lambda x: x.index.to_list()).values
     sel_index = []
     for trial in trial_index:
@@ -323,6 +326,25 @@ def z_score_wo_outlier2(df, col, coef, normalization):
     df[new] = tmp.values.T if tmp.values.shape[0] != df.shape[0] else tmp.values
     return df
 
+
+def pupil_consecutive_groups(df_total, state):
+    trial_index = df_total.groupby("file").apply(lambda x: x.index.to_list()).values
+    sel_index = []
+    vague_trial_index = []
+    for trial in trial_index:
+        trial_data = df_total.loc[trial]
+        temp = [list(each) for each in cg(trial_data[trial_data["labels"] == state].index)]
+        if len(temp) > 0:
+            sel_index.extend(temp)
+            for _ in range(len(temp)):
+                vague_trial_index.append([trial[0], trial[-1]])
+    return sel_index, vague_trial_index
+
+
+def seq_center(seq):
+    return seq[len(seq) // 2]
+
+
 # ======================================================
 
 def generate_planned_accidental(df_total):
@@ -338,18 +360,29 @@ def generate_planned_accidental(df_total):
         (df_total.eat_energizer == True)
         & (df_total[["ifscared1", "ifscared2"]].min(1).shift() < 3)
         ][["next_eat_rwd", "energizers", "ifscared1", "ifscared2"]].index
-
     energizer_lists = [
-        np.arange(
-            i,
             (df_total.loc[i:, ["ifscared1", "ifscared2"]] <= 3)
                 .max(1)
                 .where(lambda x: x == True)
                 .dropna()
-                .index[0],
-        )
+                .index
         for i in energizer_start_index
     ]
+    energizer_lists = [
+        np.arange(i, energizer_lists[idx][0]) for idx, i in enumerate(energizer_start_index)
+        if len(energizer_lists[idx]) > 0
+    ]
+    # energizer_lists = [
+    #     np.arange(
+    #         i,
+    #         (df_total.loc[i:, ["ifscared1", "ifscared2"]] <= 3)
+    #             .max(1)
+    #             .where(lambda x: x == True)
+    #             .dropna()
+    #             .index[0],
+    #     )
+    #     for i in energizer_start_index
+    # ]
     reindex_max = max([each[0] for each in energizer_lists if len(each) > 0])
     print("Max reindex : ", reindex_max)
 
@@ -409,7 +442,8 @@ def generate_planned_accidental(df_total):
         pd.Series(energizer_lists).explode().rename("sec_level_1").reset_index()
             .merge(df_total.labels.reset_index(), left_on="sec_level_1", right_on="index")
     ).groupby("index_x").apply(
-        lambda x: int(x.index_x[0]) if (x.iloc[:10].labels == "approach").mean() > 0.8 and len(x) > 0 else None
+        # lambda x: int(x.index_x[0]) if (x.iloc[:10].labels == "approach").mean() > 0.8 and len(x) > 0 else None
+        lambda x: int(x.index_x.values[0]) if (x.iloc[:10].labels == "approach").mean() > 0.8 and len(x) > 0 else None
     )
     planned_traj_index = [int(i) for i in planned_traj_index.values[~pd.isna(planned_traj_index.values)]]
     planned_lists = [np.arange(pre_index[energizer_lists[i][0]], energizer_lists[i][0]) for i in planned_traj_index]
@@ -418,7 +452,8 @@ def generate_planned_accidental(df_total):
         pd.Series(energizer_lists).explode().rename("sec_level_1").reset_index()
             .merge(df_total.labels.reset_index(), left_on="sec_level_1", right_on="index")
     ).groupby("index_x").apply(
-        lambda x: int(x.index_x[0]) if (x.iloc[:10].labels == "approach").mean() <=0.2 and (x.iloc[:10].labels == "local").mean() > 0.5 else None
+        # lambda x: int(x.index_x[0]) if (x.iloc[:10].labels == "approach").mean() <=0.2 and (x.iloc[:10].labels == "local").mean() > 0.5 else None
+        lambda x: int(x.index_x.values[0]) if (x.iloc[:10].labels == "approach").mean() <=0.2 and (x.iloc[:10].labels == "local").mean() > 0.5 else None
     )
     accidental_traj_index = [int(i) for i in accidental_traj_index.values[~pd.isna(accidental_traj_index.values)]]
     accidental_lists = [np.arange(pre_index[energizer_lists[i][0]], energizer_lists[i][0]) for i in accidental_traj_index]
@@ -672,6 +707,7 @@ def generate_suicide_normal_next(df_total, suicide):
 # =======
 def largest_2ndlargest_diff(df):
     a = df.values
+    # a = df.values[:, 2:] #TODO:只针对human数据
     return np.sort(a, axis=1)[:, -1] - np.sort(a, axis=1)[:, -2]
 
 
@@ -708,7 +744,7 @@ def go_to_most_beans(
     for n in [5]:
         if only_cross_fork:
             """这个仅仅适合n=5的情况"""
-            # extend_cross_fork(df_overlap, save_path) #TODO: no need for this
+            # extend_cross_fork(df_overlap, save_path) #
             break
         if exclude_2dirs:
             df_overlap = exclude_2dirs(df_overlap)
@@ -723,6 +759,74 @@ def go_to_most_beans(
 
         """准备画图元素"""
         """如果需要按照地形来分的话，需要把comment掉的东西都恢复"""
+        print()
+
+        result_trial_df_list = []
+        result_game_df_list = []
+        result_day_df_list = []
+        df_overlap["game"] = df_overlap.file.apply(lambda x: "-".join([x.split("-")[0]] + x.split("-")[2:6]))
+        df_overlap["day"] = df_overlap.file.apply(lambda x: "-".join(x.split("-")[2:6]))
+        for name, group in df_overlap.groupby("file"):
+            tmp_res =  (
+            group[group[["down", "up", "left", "right"]].max(1) > 0]
+            .groupby(
+                [
+                    "NextNum",
+                    "if_cross",
+                    group[
+                        group[["down", "up", "left", "right"]].max(1) > 0
+                    ].local_4dirs_diff.apply(lambda x: min(x, 4)),
+                ]
+            )
+            .choice_large.apply(
+                lambda x: pd.Series({"mean": x.mean(), "count": len(x), "std": x.std()})
+            )
+            .unstack()
+            .reset_index()
+            ).merge(cate_df, on=["if_cross", "NextNum"], how="left",)
+            result_trial_df_list.append(tmp_res)
+
+        for name, group in df_overlap.groupby("game"):
+            tmp_res =  (
+            group[group[["down", "up", "left", "right"]].max(1) > 0]
+            .groupby(
+                [
+                    "NextNum",
+                    "if_cross",
+                    group[
+                        group[["down", "up", "left", "right"]].max(1) > 0
+                    ].local_4dirs_diff.apply(lambda x: min(x, 4)),
+                ]
+            )
+            .choice_large.apply(
+                lambda x: pd.Series({"mean": x.mean(), "count": len(x), "std": x.std()})
+            )
+            .unstack()
+            .reset_index()
+            ).merge(cate_df, on=["if_cross", "NextNum"], how="left",)
+            result_game_df_list.append(tmp_res)
+
+        for name, group in df_overlap.groupby("day"):
+            tmp_res =  (
+            group[group[["down", "up", "left", "right"]].max(1) > 0]
+            .groupby(
+                [
+                    "NextNum",
+                    "if_cross",
+                    group[
+                        group[["down", "up", "left", "right"]].max(1) > 0
+                    ].local_4dirs_diff.apply(lambda x: min(x, 4)),
+                ]
+            )
+            .choice_large.apply(
+                lambda x: pd.Series({"mean": x.mean(), "count": len(x), "std": x.std()})
+            )
+            .unstack()
+            .reset_index()
+            ).merge(cate_df, on=["if_cross", "NextNum"], how="left",)
+            result_day_df_list.append(tmp_res)
+
+
         result_df = (
             df_overlap[df_overlap[["down", "up", "left", "right"]].max(1) > 0]
             .groupby(
@@ -792,7 +896,7 @@ def go_to_most_beans(
         #     plt.title(land.capitalize() + " Local Graze")
         #     # plt.savefig(save_path)
         #     plt.show()
-        return result_df
+        return result_df, result_trial_df_list, result_game_df_list, result_day_df_list
 
 
 def intersect_cnt(df, col1, col2):
@@ -897,4 +1001,216 @@ def toward_ghost_table(df_total, cond=True):
         ],
         1,
     )
-    return rs
+    all_rs = rs.copy()
+    # -----
+    result_trial_rs = []
+    result_game_rs = []
+    result_day_rs = []
+    df_total["game"] = df_total.file.apply(lambda x: "-".join([x.split("-")[0]] + x.split("-")[2:6]))
+    df_total["day"] = df_total.file.apply(lambda x: "-".join(x.split("-")[2:6]))
+    for name, group in df_total.groupby("file"):
+        rs = pd.DataFrame()
+        for w in ["1", "2"]:
+            if "ghost" + w + "_dimi_manh" not in group.columns:
+                group["ghost" + w + "_dimi_manh"] = (
+                    group[["next_pacman_dir_fill", "ghost" + w + "_wrt_pacman"]]
+                        .explode("ghost" + w + "_wrt_pacman")
+                        .apply(
+                        lambda x: x["ghost" + w + "_wrt_pacman"]
+                                  == x["next_pacman_dir_fill"],
+                        1,
+                    )
+                        .max(level=0)
+                )
+            rs = pd.concat(
+                [
+                    rs,
+                    group[
+                        (group.pacmanPos != group.pacmanPos.shift(-1))
+                        & (group["ifscared" + w] != 3)
+                        & (group["base" + w] == 0.5)
+                        & (group["distance" + w] > 2)
+                        & cond
+                        #                     & (
+                        #                         #                                                 df_total.index.isin(list(itertools.chain(*select_status[key])))
+                        #                         df_total[select_status[key]]
+                        #                         == 1
+                        #                     )
+                        ]
+                        .groupby(
+                        [
+                            group["ifscared" + w] >= 3,
+                            group["distance" + w].apply(lambda x: min(x, 25)),
+                            "pacmanPos",
+                            "ghost" + w + "Pos",
+                        ]
+                    )["ghost" + w + "_dimi_manh"]
+                        .mean()
+                        .reset_index()
+                        .drop(columns=["pacmanPos", "ghost" + w + "Pos"])
+                        .groupby(["ifscared" + w, "distance" + w])["ghost" + w + "_dimi_manh"]
+                        .agg(["mean", "std", "count"])
+                        .unstack("ifscared" + w)
+                        .rename(
+                        columns={
+                            False: "ghost(" + mapping_d[w] + ") normal",
+                            True: "ghost(" + mapping_d[w] + ") scared",
+                        }
+                    ),
+                ],
+                1,
+            )
+        rs = rs.stack().reset_index()
+        try:
+            rs = pd.concat(
+                [
+                    rs,
+                    rs.ifscared1.str.split(" ", expand=True).rename(
+                        columns={0: "ghost", 1: "status"}
+                    ),
+                ],
+                1,
+            )
+            result_trial_rs.append(rs.copy())
+        except:
+            print("Error data : {}".format(rs))
+            continue
+    # -----
+    for name, group in df_total.groupby("game"):
+        rs = pd.DataFrame()
+        for w in ["1", "2"]:
+            if "ghost" + w + "_dimi_manh" not in group.columns:
+                group["ghost" + w + "_dimi_manh"] = (
+                    group[["next_pacman_dir_fill", "ghost" + w + "_wrt_pacman"]]
+                        .explode("ghost" + w + "_wrt_pacman")
+                        .apply(
+                        lambda x: x["ghost" + w + "_wrt_pacman"]
+                                  == x["next_pacman_dir_fill"],
+                        1,
+                    )
+                        .max(level=0)
+                )
+            rs = pd.concat(
+                [
+                    rs,
+                    group[
+                        (group.pacmanPos != group.pacmanPos.shift(-1))
+                        & (group["ifscared" + w] != 3)
+                        & (group["base" + w] == 0.5)
+                        & (group["distance" + w] > 2)
+                        & cond
+                        #                     & (
+                        #                         #                                                 df_total.index.isin(list(itertools.chain(*select_status[key])))
+                        #                         df_total[select_status[key]]
+                        #                         == 1
+                        #                     )
+                        ]
+                        .groupby(
+                        [
+                            group["ifscared" + w] >= 3,
+                            group["distance" + w].apply(lambda x: min(x, 25)),
+                            "pacmanPos",
+                            "ghost" + w + "Pos",
+                        ]
+                    )["ghost" + w + "_dimi_manh"]
+                        .mean()
+                        .reset_index()
+                        .drop(columns=["pacmanPos", "ghost" + w + "Pos"])
+                        .groupby(["ifscared" + w, "distance" + w])["ghost" + w + "_dimi_manh"]
+                        .agg(["mean", "std", "count"])
+                        .unstack("ifscared" + w)
+                        .rename(
+                        columns={
+                            False: "ghost(" + mapping_d[w] + ") normal",
+                            True: "ghost(" + mapping_d[w] + ") scared",
+                        }
+                    ),
+                ],
+                1,
+            )
+
+        rs = rs.stack().reset_index()
+        try:
+            rs = pd.concat(
+                [
+                    rs,
+                    rs.ifscared1.str.split(" ", expand=True).rename(
+                        columns={0: "ghost", 1: "status"}
+                    ),
+                ],
+                1,
+            )
+            result_game_rs.append(rs.copy())
+        except:
+            print("Error data : {}".format(rs))
+            continue
+    # -----
+    for name, group in df_total.groupby("day"):
+        rs = pd.DataFrame()
+        for w in ["1", "2"]:
+            if "ghost" + w + "_dimi_manh" not in group.columns:
+                group["ghost" + w + "_dimi_manh"] = (
+                    group[["next_pacman_dir_fill", "ghost" + w + "_wrt_pacman"]]
+                        .explode("ghost" + w + "_wrt_pacman")
+                        .apply(
+                        lambda x: x["ghost" + w + "_wrt_pacman"]
+                                  == x["next_pacman_dir_fill"],
+                        1,
+                    )
+                        .max(level=0)
+                )
+            rs = pd.concat(
+                [
+                    rs,
+                    group[
+                        (group.pacmanPos != group.pacmanPos.shift(-1))
+                        & (group["ifscared" + w] != 3)
+                        & (group["base" + w] == 0.5)
+                        & (group["distance" + w] > 2)
+                        & cond
+                        #                     & (
+                        #                         #                                                 df_total.index.isin(list(itertools.chain(*select_status[key])))
+                        #                         df_total[select_status[key]]
+                        #                         == 1
+                        #                     )
+                        ]
+                        .groupby(
+                        [
+                            group["ifscared" + w] >= 3,
+                            group["distance" + w].apply(lambda x: min(x, 25)),
+                            "pacmanPos",
+                            "ghost" + w + "Pos",
+                        ]
+                    )["ghost" + w + "_dimi_manh"]
+                        .mean()
+                        .reset_index()
+                        .drop(columns=["pacmanPos", "ghost" + w + "Pos"])
+                        .groupby(["ifscared" + w, "distance" + w])["ghost" + w + "_dimi_manh"]
+                        .agg(["mean", "std", "count"])
+                        .unstack("ifscared" + w)
+                        .rename(
+                        columns={
+                            False: "ghost(" + mapping_d[w] + ") normal",
+                            True: "ghost(" + mapping_d[w] + ") scared",
+                        }
+                    ),
+                ],
+                1,
+            )
+
+        rs = rs.stack().reset_index()
+        try:
+            rs = pd.concat(
+                [
+                    rs,
+                    rs.ifscared1.str.split(" ", expand=True).rename(
+                        columns={0: "ghost", 1: "status"}
+                    ),
+                ],
+                1,
+            )
+            result_day_rs.append(rs.copy())
+        except:
+            print("Error data : {}".format(rs))
+            continue
+    return all_rs, result_trial_rs, result_game_rs, result_day_rs

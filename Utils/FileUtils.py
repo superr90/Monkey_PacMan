@@ -1,12 +1,6 @@
 '''
 Description:
     Tool functions for the analysis.
-    
-Author:
-    Jiaqi Zhang <zjqseu@gmail.com>
-    
-Date:
-    Apr. 21 2020
 '''
 
 import pandas as pd
@@ -30,6 +24,30 @@ def readAdjacentMap(filename):
         dict_adjacent_data[each[1]]["right"] = each[3] if not isinstance(each[3], float) else np.nan
         dict_adjacent_data[each[1]]["up"] = each[4] if not isinstance(each[4], float) else np.nan
         dict_adjacent_data[each[1]]["down"] = each[5] if not isinstance(each[5], float) else np.nan
+    if (-1, 18) not in dict_adjacent_data:
+        dict_adjacent_data[(-1, 18)] = {}
+    if (0, 18) not in dict_adjacent_data:
+        dict_adjacent_data[(0, 18)] = {}
+    if (29, 18) not in dict_adjacent_data:
+        dict_adjacent_data[(29, 18)] = {}
+    if (30, 18) not in dict_adjacent_data:
+        dict_adjacent_data[(30, 18)] = {}
+    dict_adjacent_data[(-1, 18)]["left"] = (30, 18)
+    dict_adjacent_data[(-1, 18)]["right"] = (0, 18)
+    dict_adjacent_data[(-1, 18)]["up"] = np.nan
+    dict_adjacent_data[(-1, 18)]["down"] = np.nan
+    dict_adjacent_data[(0, 18)]["left"] = (-1, 18)
+    dict_adjacent_data[(0, 18)]["right"] = (1, 18)
+    dict_adjacent_data[(0, 18)]["up"] = np.nan
+    dict_adjacent_data[(0, 18)]["down"] = np.nan
+    dict_adjacent_data[(29, 18)]["left"] = (28, 18)
+    dict_adjacent_data[(29, 18)]["right"] = (30, 18)
+    dict_adjacent_data[(29, 18)]["up"] = np.nan
+    dict_adjacent_data[(29, 18)]["down"] = np.nan
+    dict_adjacent_data[(30, 18)]["left"] = (29, 18)
+    dict_adjacent_data[(30, 18)]["right"] = (-1, 18)
+    dict_adjacent_data[(30, 18)]["up"] = np.nan
+    dict_adjacent_data[(30, 18)]["down"] = np.nan
     return dict_adjacent_data
 
 
@@ -59,6 +77,7 @@ def readLocDistance(filename):
         dict_locs_df[each[0]][each[1]] = each[2]
     # correct the distance between two ends of the tunnel
     dict_locs_df[(0, 18)][(29, 18)] = 1
+    # dict_locs_df[(0, 18)][(30, 18)] = 1
     dict_locs_df[(0, 18)][(1, 18)] = 1
     dict_locs_df[(29, 18)][(0, 18)] = 1
     dict_locs_df[(29, 18)][(28, 18)] = 1
